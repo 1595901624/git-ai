@@ -1,4 +1,4 @@
-use super::transcript_worker::{Priority, ProcessingTask};
+use super::stream_worker::{Priority, ProcessingTask};
 use std::collections::BinaryHeap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};

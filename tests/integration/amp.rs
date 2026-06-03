@@ -141,9 +141,9 @@ fn test_amp_preset_posttooluse_returns_ai_checkpoint() {
                 vec![PathBuf::from("/Users/test/project/jokes.csv")]
             );
             // Transcript should be a path reference (lazy loading)
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
             let transcript_path_str = e
-                .transcript_source
+                .stream_source
                 .as_ref()
                 .map(|ts| ts.path.to_string_lossy().to_string())
                 .unwrap();

@@ -324,7 +324,7 @@ impl Agent for OpenCodeAgent {
         file_meta: &std::fs::Metadata,
         is_first_event: bool,
     ) -> u32 {
-        crate::daemon::transcript_worker::extract_event_timestamp(event)
+        crate::daemon::stream_worker::extract_event_timestamp(event)
             .unwrap_or_else(|| crate::streams::agent::file_time_fallback(file_meta, is_first_event))
     }
 

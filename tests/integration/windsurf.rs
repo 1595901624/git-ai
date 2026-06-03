@@ -70,7 +70,7 @@ fn test_windsurf_preset_ai_checkpoint_post_write_code() {
                     .any(|p| p.to_string_lossy().contains("main.rs")),
                 "Should have edited_filepaths"
             );
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
             assert_eq!(e.context.agent_id.tool, "windsurf");
             // No model_name in hook input -> falls back to "unknown"
             assert_eq!(e.context.agent_id.model, "unknown");
@@ -148,7 +148,7 @@ fn test_windsurf_preset_ai_checkpoint_post_cascade() {
     // post_cascade_response_with_transcript is an AI checkpoint variant
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
         }
         _ => panic!("Expected PostFileEdit for post_cascade_response_with_transcript"),
     }

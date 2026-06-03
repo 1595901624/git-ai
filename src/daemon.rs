@@ -75,13 +75,13 @@ pub mod git_backend;
 pub mod global_actor;
 pub mod reducer;
 pub mod sentry_layer;
+pub mod stream_worker;
 pub mod sweep_coordinator;
 pub mod telemetry_handle;
 pub mod telemetry_worker;
 pub mod test_sync;
 pub mod trace_normalizer;
 pub mod transcript_redaction;
-pub mod transcript_worker;
 
 pub use control_api::{
     BashSessionQueryResponse, BashSnapshotQueryResponse, ControlRequest, ControlResponse,
@@ -1917,7 +1917,7 @@ fn build_human_replay_checkpoint_request(
         agent_id: None,
         files: checkpoint_files,
         path_role: PreparedPathRole::WillEdit,
-        transcript_source: None,
+        stream_source: None,
         metadata: std::collections::HashMap::new(),
     }
 }
@@ -3902,7 +3902,7 @@ pub struct ActorDaemonCoordinator {
     // exits via the shutdown select! arm instead of relying on channel closure.
     trace_ingest_tx: std::sync::OnceLock<mpsc::Sender<Value>>,
     telemetry_worker: Option<crate::daemon::telemetry_worker::DaemonTelemetryWorkerHandle>,
-    transcript_worker: Option<crate::daemon::transcript_worker::TranscriptWorkerHandle>,
+    stream_worker: Option<crate::daemon::stream_worker::StreamWorkerHandle>,
     transcript_shutdown_notify: std::sync::OnceLock<Arc<tokio::sync::Notify>>,
     streams_db: Option<Arc<crate::streams::db::StreamsDatabase>>,
     next_trace_ingest_seq: AtomicUsize,
@@ -4001,7 +4001,7 @@ impl ActorDaemonCoordinator {
             test_completion_log_lock: Mutex::new(()),
             trace_ingest_tx: std::sync::OnceLock::new(),
             telemetry_worker: None,
-            transcript_worker: None,
+            stream_worker: None,
             transcript_shutdown_notify: std::sync::OnceLock::new(),
             streams_db: None,
             next_trace_ingest_seq: AtomicUsize::new(0),
@@ -7465,10 +7465,10 @@ impl ActorDaemonCoordinator {
     async fn handle_control_request(&self, request: ControlRequest) -> ControlResponse {
         let result = match request {
             ControlRequest::CheckpointRun { request } => {
-                if let Some(worker) = &self.transcript_worker
-                    && let Some(transcript_source) = &request.transcript_source
+                if let Some(worker) = &self.stream_worker
+                    && let Some(stream_source) = &request.stream_source
                 {
-                    let session_id = transcript_source.session_id.clone();
+                    let session_id = stream_source.session_id.clone();
                     let tool = request
                         .agent_id
                         .as_ref()
@@ -7484,10 +7484,10 @@ impl ActorDaemonCoordinator {
                         tool,
                         trace_id,
                         tool_use_id,
-                        transcript_source.path.clone(),
+                        stream_source.path.clone(),
                         repo_work_dir,
-                        transcript_source.external_session_id.clone(),
-                        transcript_source.external_parent_session_id.clone(),
+                        stream_source.external_session_id.clone(),
+                        stream_source.external_parent_session_id.clone(),
                     );
                 }
 
@@ -8467,13 +8467,13 @@ pub(crate) async fn run_daemon(config: DaemonConfig) -> Result<DaemonExitAction,
             Ok(streams_db) => {
                 let streams_db = std::sync::Arc::new(streams_db);
                 let shutdown_notify = Arc::new(tokio::sync::Notify::new());
-                let transcript_handle = crate::daemon::transcript_worker::spawn_transcript_worker(
+                let transcript_handle = crate::daemon::stream_worker::spawn_stream_worker(
                     streams_db.clone(),
                     telemetry_handle.clone(),
                     shutdown_notify.clone(),
                 );
                 coordinator_inner.streams_db = Some(streams_db);
-                coordinator_inner.transcript_worker = Some(transcript_handle);
+                coordinator_inner.stream_worker = Some(transcript_handle);
                 let _ = coordinator_inner
                     .transcript_shutdown_notify
                     .set(shutdown_notify);
@@ -8874,7 +8874,7 @@ pub fn send_control_request_fire_and_forget(
 }
 
 #[cfg(test)]
-mod transcript_worker_tests;
+mod stream_worker_tests;
 
 #[cfg(test)]
 mod tests {
@@ -8944,7 +8944,7 @@ mod tests {
                     base_commit: BaseCommit::Initial,
                 }],
                 path_role: PreparedPathRole::WillEdit,
-                transcript_source: None,
+                stream_source: None,
                 metadata: std::collections::HashMap::new(),
             }),
         }

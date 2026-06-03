@@ -67,7 +67,7 @@ fn test_codex_preset_structured_hook_input() {
                 e.context.cwd.to_string_lossy(),
                 "/Users/test/projects/git-ai"
             );
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
         }
         _ => panic!("Expected PostFileEdit"),
     }
@@ -157,7 +157,7 @@ fn test_codex_preset_bash_post_tool_use_detects_changed_files() {
     assert_eq!(events.len(), 1);
     match &events[0] {
         ParsedHookEvent::PostBashCall(e) => {
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
             assert_eq!(e.context.agent_id.tool, "codex");
             assert_eq!(e.context.external_session_id, "session-bash-post");
             assert_eq!(e.tool_use_id, "bash-use-2");

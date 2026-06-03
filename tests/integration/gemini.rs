@@ -130,7 +130,7 @@ fn test_gemini_preset_ai_checkpoint() {
     assert_eq!(events.len(), 1);
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
-            assert!(e.transcript_source.is_some(), "Should have transcript");
+            assert!(e.stream_source.is_some(), "Should have transcript");
             assert!(!e.file_paths.is_empty(), "Should have edited_filepaths");
         }
         _ => panic!("Expected PostFileEdit for AfterTool"),

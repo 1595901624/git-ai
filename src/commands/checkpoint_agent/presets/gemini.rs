@@ -1,7 +1,7 @@
 use super::parse;
 use super::{
     AgentPreset, ParsedHookEvent, PostBashCall, PostFileEdit, PreBashCall, PreFileEdit,
-    PresetContext, StreamFormat, TranscriptSource,
+    PresetContext, StreamFormat, StreamSource,
 };
 use crate::authorship::authorship_log_serialization::generate_session_id;
 use crate::authorship::working_log::AgentId;
@@ -47,7 +47,7 @@ impl AgentPreset for GeminiPreset {
             metadata: HashMap::from([("transcript_path".to_string(), transcript_path.to_string())]),
         };
 
-        let transcript_source = Some(TranscriptSource {
+        let stream_source = Some(StreamSource {
             path: PathBuf::from(transcript_path),
             format: StreamFormat::GeminiJsonl,
             session_id: generate_session_id(&context.external_session_id, "gemini"),
@@ -72,13 +72,13 @@ impl AgentPreset for GeminiPreset {
             (false, true) => ParsedHookEvent::PostBashCall(PostBashCall {
                 context,
                 tool_use_id: tool_use_id.to_string(),
-                transcript_source,
+                stream_source,
             }),
             (false, false) => ParsedHookEvent::PostFileEdit(PostFileEdit {
                 context,
                 file_paths: parse::file_paths_from_tool_input(&data, cwd),
                 dirty_files: None,
-                transcript_source,
+                stream_source,
                 tool_use_id: Some(tool_use_id.to_string()),
             }),
         };
@@ -139,8 +139,8 @@ mod tests {
                     vec![PathBuf::from("/home/user/project/src/main.rs")]
                 );
                 assert!(matches!(
-                    e.transcript_source,
-                    Some(TranscriptSource {
+                    e.stream_source,
+                    Some(StreamSource {
                         format: StreamFormat::GeminiJsonl,
                         ..
                     })

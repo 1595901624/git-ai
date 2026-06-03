@@ -372,7 +372,7 @@ fn test_concurrent_processing_deduplication() {
     let transcript_path = temp_dir.path().join("conversation.jsonl");
     create_claude_transcript(&transcript_path, &["Message"]).unwrap();
 
-    // Canonicalize the path (this is what TranscriptWorker does)
+    // Canonicalize the path (this is what StreamWorker does)
     let canonical_path1 = std::fs::canonicalize(&transcript_path).unwrap();
 
     // The same path should canonicalize to the same value
@@ -383,7 +383,7 @@ fn test_concurrent_processing_deduplication() {
         "Canonical paths should be identical"
     );
 
-    // If we use a HashSet like TranscriptWorker does
+    // If we use a HashSet like StreamWorker does
     use std::collections::HashSet;
     let mut in_flight = HashSet::new();
 
@@ -440,7 +440,7 @@ fn test_watermark_persistence_after_processing() {
 
     assert_eq!(batch.events.len(), 2);
 
-    // Update watermark in DB (simulating TranscriptWorker.process_session_blocking)
+    // Update watermark in DB (simulating StreamWorker.process_session_blocking)
     db.update_watermark(
         "test_session",
         "transcript",

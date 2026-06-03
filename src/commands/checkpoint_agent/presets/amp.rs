@@ -1,7 +1,7 @@
 use super::parse;
 use super::{
     AgentPreset, ParsedHookEvent, PostBashCall, PostFileEdit, PreBashCall, PreFileEdit,
-    PresetContext, StreamFormat, TranscriptSource,
+    PresetContext, StreamFormat, StreamSource,
 };
 use crate::authorship::authorship_log_serialization::generate_session_id;
 use crate::authorship::working_log::AgentId;
@@ -265,7 +265,7 @@ impl AgentPreset for AmpPreset {
 
         let file_paths = Self::extract_file_paths(&hook_input, cwd);
 
-        // Resolve transcript path for TranscriptSource
+        // Resolve transcript path for StreamSource
         let resolved_transcript_path = Self::resolve_transcript_path(
             hook_input.transcript_path.as_deref(),
             thread_id.as_deref(),
@@ -321,7 +321,7 @@ impl AgentPreset for AmpPreset {
             metadata,
         };
 
-        let transcript_source = resolved_transcript_path.map(|path| TranscriptSource {
+        let stream_source = resolved_transcript_path.map(|path| StreamSource {
             path,
             format: StreamFormat::AmpThreadJson,
             session_id: generate_session_id(&context.external_session_id, "amp"),
@@ -343,13 +343,13 @@ impl AgentPreset for AmpPreset {
             (false, true) => ParsedHookEvent::PostBashCall(PostBashCall {
                 context,
                 tool_use_id: tool_use_id_str,
-                transcript_source,
+                stream_source,
             }),
             (false, false) => ParsedHookEvent::PostFileEdit(PostFileEdit {
                 context,
                 file_paths,
                 dirty_files: None,
-                transcript_source,
+                stream_source,
                 tool_use_id: tool_use_id.clone(),
             }),
         };
@@ -415,8 +415,8 @@ mod tests {
                     e.file_paths,
                     vec![PathBuf::from("/home/user/project/src/main.rs")]
                 );
-                // No existing transcript file, so transcript_source is None
-                assert!(e.transcript_source.is_none());
+                // No existing transcript file, so stream_source is None
+                assert!(e.stream_source.is_none());
             }
             _ => panic!("Expected PostFileEdit"),
         }

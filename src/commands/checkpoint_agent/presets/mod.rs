@@ -58,7 +58,7 @@ pub struct PostFileEdit {
     pub context: PresetContext,
     pub file_paths: Vec<PathBuf>,
     pub dirty_files: Option<HashMap<PathBuf, String>>,
-    pub transcript_source: Option<TranscriptSource>,
+    pub stream_source: Option<StreamSource>,
     #[serde(default)]
     pub tool_use_id: Option<String>,
 }
@@ -89,11 +89,11 @@ pub struct PreBashCall {
 pub struct PostBashCall {
     pub context: PresetContext,
     pub tool_use_id: String,
-    pub transcript_source: Option<TranscriptSource>,
+    pub stream_source: Option<StreamSource>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TranscriptSource {
+pub struct StreamSource {
     pub path: PathBuf,
     pub format: StreamFormat,
     /// Session ID for this transcript (used to query/create session in DB).

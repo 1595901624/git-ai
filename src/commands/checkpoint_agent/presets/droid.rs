@@ -1,7 +1,7 @@
 use super::parse;
 use super::{
     AgentPreset, ParsedHookEvent, PostBashCall, PostFileEdit, PreBashCall, PreFileEdit,
-    PresetContext, StreamFormat, TranscriptSource,
+    PresetContext, StreamFormat, StreamSource,
 };
 use crate::authorship::authorship_log_serialization::generate_session_id;
 use crate::authorship::working_log::AgentId;
@@ -154,7 +154,7 @@ impl AgentPreset for DroidPreset {
             metadata,
         };
 
-        let transcript_source = Some(TranscriptSource {
+        let stream_source = Some(StreamSource {
             path: PathBuf::from(&resolved_transcript_path),
             format: StreamFormat::DroidJsonl,
             session_id: generate_session_id(&context.external_session_id, "droid"),
@@ -183,7 +183,7 @@ impl AgentPreset for DroidPreset {
             return Ok(vec![ParsedHookEvent::PostBashCall(PostBashCall {
                 context,
                 tool_use_id,
-                transcript_source,
+                stream_source,
             })]);
         }
 
@@ -191,7 +191,7 @@ impl AgentPreset for DroidPreset {
             context,
             file_paths,
             dirty_files: None,
-            transcript_source,
+            stream_source,
             tool_use_id: Some(tool_use_id.clone()),
         })])
     }
@@ -263,8 +263,8 @@ mod tests {
                     e.file_paths,
                     vec![PathBuf::from("/home/user/project/src/main.rs")]
                 );
-                assert!(e.transcript_source.is_some());
-                if let Some(ts) = &e.transcript_source {
+                assert!(e.stream_source.is_some());
+                if let Some(ts) = &e.stream_source {
                     assert_eq!(ts.format, StreamFormat::DroidJsonl);
                 }
             }
@@ -295,8 +295,8 @@ mod tests {
             ParsedHookEvent::PostBashCall(e) => {
                 assert_eq!(e.context.agent_id.tool, "droid");
                 assert_eq!(e.tool_use_id, "tu-1");
-                assert!(e.transcript_source.is_some());
-                if let Some(ts) = &e.transcript_source {
+                assert!(e.stream_source.is_some());
+                if let Some(ts) = &e.stream_source {
                     assert_eq!(ts.format, StreamFormat::DroidJsonl);
                 }
             }

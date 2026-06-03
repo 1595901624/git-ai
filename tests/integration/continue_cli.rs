@@ -177,7 +177,7 @@ fn test_continue_cli_preset_ai_checkpoint() {
 
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
             assert!(!e.file_paths.is_empty());
         }
         _ => panic!("Expected PostFileEdit for AI checkpoint"),
@@ -255,7 +255,7 @@ fn test_continue_cli_preset_handles_missing_file() {
     })
     .to_string();
 
-    // The new parse() API succeeds (transcript is lazy via TranscriptSource::Path)
+    // The new parse() API succeeds (transcript is lazy via StreamSource::Path)
     let events = parse_continue(&hook_input).expect("Parse should succeed with lazy transcript");
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {

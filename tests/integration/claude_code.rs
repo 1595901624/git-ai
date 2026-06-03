@@ -326,7 +326,7 @@ fn test_claude_subagent_checkpoint_sets_parent_session_id() {
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
             let ts = e
-                .transcript_source
+                .stream_source
                 .as_ref()
                 .expect("should have transcript source");
             assert_eq!(
@@ -367,7 +367,7 @@ fn test_claude_normal_session_checkpoint_has_no_parent() {
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
             let ts = e
-                .transcript_source
+                .stream_source
                 .as_ref()
                 .expect("should have transcript source");
             assert_eq!(

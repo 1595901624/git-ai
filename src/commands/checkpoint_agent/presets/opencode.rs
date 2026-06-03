@@ -1,6 +1,6 @@
 use super::{
     AgentPreset, ParsedHookEvent, PostBashCall, PostFileEdit, PreBashCall, PreFileEdit,
-    PresetContext, StreamFormat, TranscriptSource,
+    PresetContext, StreamFormat, StreamSource,
 };
 use crate::authorship::authorship_log_serialization::generate_session_id;
 use crate::authorship::working_log::AgentId;
@@ -144,7 +144,7 @@ impl OpenCodePreset {
         Some(joined.to_string_lossy().replace('\\', "/"))
     }
 
-    fn resolve_transcript_source(session_id: &str) -> Option<(TranscriptSource, PathBuf)> {
+    fn resolve_stream_source(session_id: &str) -> Option<(StreamSource, PathBuf)> {
         let opencode_path = if let Ok(test_path) = std::env::var("GIT_AI_OPENCODE_STORAGE_PATH") {
             PathBuf::from(test_path)
         } else {
@@ -156,7 +156,7 @@ impl OpenCodePreset {
         if let Some(db_path) = db_path {
             let parent_id = Self::lookup_parent_session(&db_path, session_id);
             return Some((
-                TranscriptSource {
+                StreamSource {
                     path: db_path,
                     format: StreamFormat::OpenCodeSqlite,
                     session_id: generate_session_id(session_id, "opencode"),
@@ -289,7 +289,7 @@ impl AgentPreset for OpenCodePreset {
         }
 
         // Resolve transcript source
-        let transcript_result = Self::resolve_transcript_source(&session_id);
+        let transcript_result = Self::resolve_stream_source(&session_id);
 
         let extracted_model = transcript_result.as_ref().and_then(|(ts, _)| {
             crate::streams::model_extraction::extract_model(
@@ -313,7 +313,7 @@ impl AgentPreset for OpenCodePreset {
             metadata,
         };
 
-        let transcript_source = transcript_result.map(|(source, _)| source);
+        let stream_source = transcript_result.map(|(source, _)| source);
 
         let event = match (is_pre, is_bash) {
             (true, true) => ParsedHookEvent::PreBashCall(PreBashCall {
@@ -329,13 +329,13 @@ impl AgentPreset for OpenCodePreset {
             (false, true) => ParsedHookEvent::PostBashCall(PostBashCall {
                 context,
                 tool_use_id: tool_use_id_str,
-                transcript_source,
+                stream_source,
             }),
             (false, false) => ParsedHookEvent::PostFileEdit(PostFileEdit {
                 context,
                 file_paths,
                 dirty_files: None,
-                transcript_source,
+                stream_source,
                 tool_use_id: Some(tool_use_id_str),
             }),
         };

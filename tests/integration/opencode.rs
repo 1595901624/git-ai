@@ -207,7 +207,7 @@ fn test_opencode_preset_posttooluse_returns_ai_checkpoint() {
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
             assert!(
-                e.transcript_source.is_some(),
+                e.stream_source.is_some(),
                 "Transcript should be present for AI checkpoint"
             );
             assert!(
@@ -620,7 +620,7 @@ fn test_opencode_checkpoint_sets_parent_session_id_from_db() {
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
             let ts = e
-                .transcript_source
+                .stream_source
                 .as_ref()
                 .expect("should have transcript source");
             assert_eq!(

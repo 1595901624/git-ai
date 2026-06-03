@@ -238,7 +238,7 @@ fn test_checkpoint_base_override_controls_head_context_for_entry_generation() {
             base_commit: BaseCommit::Sha(base_commit.clone()),
         }],
         path_role: PreparedPathRole::Edited,
-        transcript_source: None,
+        stream_source: None,
         metadata: HashMap::new(),
     };
 
@@ -380,7 +380,7 @@ fn test_checkpoint_with_paths_outside_repo() {
             base_commit: BaseCommit::Sha(base_commit),
         }],
         path_role: PreparedPathRole::Edited,
-        transcript_source: None,
+        stream_source: None,
         metadata: HashMap::new(),
     };
 
@@ -1300,7 +1300,7 @@ fn test_checkpoint_succeeds_with_legacy_initial_missing_blobs() {
             base_commit: BaseCommit::Sha(head_sha),
         }],
         path_role: PreparedPathRole::Edited,
-        transcript_source: None,
+        stream_source: None,
         metadata: HashMap::new(),
     };
 

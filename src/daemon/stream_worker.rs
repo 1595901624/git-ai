@@ -83,11 +83,11 @@ impl Ord for ProcessingTask {
 
 /// Handle for sending checkpoint notifications to the worker.
 #[derive(Clone)]
-pub struct TranscriptWorkerHandle {
+pub struct StreamWorkerHandle {
     checkpoint_tx: tokio::sync::mpsc::UnboundedSender<CheckpointNotification>,
 }
 
-impl TranscriptWorkerHandle {
+impl StreamWorkerHandle {
     /// Notify the worker that a checkpoint was recorded.
     #[allow(clippy::too_many_arguments)]
     pub fn notify_checkpoint(
@@ -128,7 +128,7 @@ struct CheckpointNotification {
 }
 
 /// Worker that processes transcript changes.
-struct TranscriptWorker {
+struct StreamWorker {
     streams_db: Arc<StreamsDatabase>,
     sweep_coordinator: crate::daemon::sweep_coordinator::SweepCoordinator, // NEW
     priority_queue: BinaryHeap<ProcessingTask>,
@@ -139,7 +139,7 @@ struct TranscriptWorker {
     checkpoint_rx: tokio::sync::mpsc::UnboundedReceiver<CheckpointNotification>,
 }
 
-impl TranscriptWorker {
+impl StreamWorker {
     /// Create a new transcript worker.
     fn new(
         streams_db: Arc<StreamsDatabase>,
@@ -1036,21 +1036,20 @@ impl TranscriptWorker {
 }
 
 /// Spawn the transcript worker.
-pub fn spawn_transcript_worker(
+pub fn spawn_stream_worker(
     streams_db: Arc<StreamsDatabase>,
     telemetry_handle: DaemonTelemetryWorkerHandle,
     shutdown_notify: Arc<Notify>,
-) -> TranscriptWorkerHandle {
+) -> StreamWorkerHandle {
     let (checkpoint_tx, checkpoint_rx) = tokio::sync::mpsc::unbounded_channel();
 
-    let worker =
-        TranscriptWorker::new(streams_db, telemetry_handle, shutdown_notify, checkpoint_rx);
+    let worker = StreamWorker::new(streams_db, telemetry_handle, shutdown_notify, checkpoint_rx);
 
     tokio::spawn(async move {
         worker.run().await;
     });
 
-    TranscriptWorkerHandle { checkpoint_tx }
+    StreamWorkerHandle { checkpoint_tx }
 }
 
 #[cfg(test)]
@@ -1112,11 +1111,11 @@ mod subagent_sweep_tests {
     use std::io::Write;
     use tempfile::TempDir;
 
-    fn make_worker(db: Arc<StreamsDatabase>) -> TranscriptWorker {
+    fn make_worker(db: Arc<StreamsDatabase>) -> StreamWorker {
         let (_tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let shutdown = Arc::new(Notify::new());
         let telemetry = DaemonTelemetryWorkerHandle::new_noop();
-        TranscriptWorker::new(db, telemetry, shutdown, rx)
+        StreamWorker::new(db, telemetry, shutdown, rx)
     }
 
     #[test]

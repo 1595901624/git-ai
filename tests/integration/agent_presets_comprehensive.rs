@@ -111,7 +111,7 @@ fn test_claude_preset_invalid_transcript_path() {
     assert_eq!(events.len(), 1);
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
         }
         _ => panic!("Expected PostFileEdit for PostToolUse"),
     }
@@ -548,7 +548,7 @@ fn test_codex_preset_invalid_transcript_path() {
     assert_eq!(events.len(), 1);
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
-            assert!(e.transcript_source.is_some());
+            assert!(e.stream_source.is_some());
             assert_eq!(e.context.agent_id.model, "unknown");
             assert_eq!(e.context.agent_id.id, "test-session-12345");
         }
@@ -808,7 +808,7 @@ fn test_aitab_preset_after_edit_checkpoint() {
     assert_eq!(events.len(), 1);
     match &events[0] {
         ParsedHookEvent::PostFileEdit(e) => {
-            assert!(e.transcript_source.is_none());
+            assert!(e.stream_source.is_none());
             assert_eq!(e.file_paths, vec![std::path::PathBuf::from("/file1.rs")]);
         }
         _ => panic!("Expected PostFileEdit for after_edit"),

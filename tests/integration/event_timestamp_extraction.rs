@@ -1,5 +1,5 @@
 use crate::test_utils::{fixture_path, load_fixture};
-use git_ai::daemon::transcript_worker::extract_event_timestamp;
+use git_ai::daemon::stream_worker::extract_event_timestamp;
 use git_ai::streams::agent::Agent;
 use git_ai::streams::agents::CopilotAgent;
 use git_ai::streams::watermark::RecordIndexWatermark;
