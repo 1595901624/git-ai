@@ -30,7 +30,7 @@ use crate::{
         restore_working_log_carryover, rewrite_authorship_after_commit_amend_with_snapshot,
         rewrite_authorship_if_needed,
     },
-    authorship::working_log::CheckpointKind,
+    authorship::working_log::{AgentId, CheckpointKind},
     commands::checkpoint_agent::orchestrator::CheckpointRequest,
     commands::hooks::{push_hooks, stash_hooks},
     daemon::checkpoint::PreparedPathRole,
@@ -1894,6 +1894,26 @@ fn build_human_replay_checkpoint_request(
     files: Vec<String>,
     dirty_files: HashMap<String, String>,
 ) -> CheckpointRequest {
+    build_replay_checkpoint_request(
+        repo_work_dir,
+        files,
+        dirty_files,
+        CheckpointKind::Human,
+        None,
+        PreparedPathRole::WillEdit,
+        HashMap::new(),
+    )
+}
+
+fn build_replay_checkpoint_request(
+    repo_work_dir: &str,
+    files: Vec<String>,
+    dirty_files: HashMap<String, String>,
+    checkpoint_kind: CheckpointKind,
+    agent_id: Option<AgentId>,
+    path_role: PreparedPathRole,
+    metadata: HashMap<String, String>,
+) -> CheckpointRequest {
     let base_commit = crate::commands::checkpoint_agent::orchestrator::BaseCommit::Initial;
     let repo_work_dir_path = std::path::PathBuf::from(repo_work_dir);
 
@@ -1913,12 +1933,12 @@ fn build_human_replay_checkpoint_request(
 
     CheckpointRequest {
         trace_id: crate::authorship::authorship_log_serialization::generate_trace_id(),
-        checkpoint_kind: CheckpointKind::Human,
-        agent_id: None,
+        checkpoint_kind,
+        agent_id,
         files: checkpoint_files,
-        path_role: PreparedPathRole::WillEdit,
+        path_role,
         stream_source: None,
-        metadata: std::collections::HashMap::new(),
+        metadata,
     }
 }
 
@@ -2648,17 +2668,34 @@ fn sync_pre_commit_checkpoint_for_daemon_commit(
         return Ok(());
     }
 
-    let replay_checkpoint_request = build_human_replay_checkpoint_request(
-        &repo_workdir,
-        changed_files.clone(),
-        dirty_files.clone(),
-    );
-
-    let checkpoint_kind = if active_bash.is_some() {
-        CheckpointKind::AiAgent
-    } else {
-        CheckpointKind::Human
-    };
+    let (checkpoint_kind, replay_checkpoint_request) =
+        if let Some((agent_id, metadata)) = active_bash {
+            let mut metadata = metadata.clone();
+            metadata
+                .entry("edit_kind".to_string())
+                .or_insert_with(|| "bash".to_string());
+            (
+                CheckpointKind::AiAgent,
+                build_replay_checkpoint_request(
+                    &repo_workdir,
+                    changed_files.clone(),
+                    dirty_files.clone(),
+                    CheckpointKind::AiAgent,
+                    Some(agent_id.clone()),
+                    PreparedPathRole::Edited,
+                    metadata,
+                ),
+            )
+        } else {
+            (
+                CheckpointKind::Human,
+                build_human_replay_checkpoint_request(
+                    &repo_workdir,
+                    changed_files.clone(),
+                    dirty_files.clone(),
+                ),
+            )
+        };
 
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -8948,6 +8985,50 @@ mod tests {
                 metadata: std::collections::HashMap::new(),
             }),
         }
+    }
+
+    #[test]
+    fn human_replay_checkpoint_request_has_no_agent_identity() {
+        let request = build_human_replay_checkpoint_request(
+            "/repo",
+            vec!["src/main.rs".to_string()],
+            HashMap::from([("src/main.rs".to_string(), "fn main() {}\n".to_string())]),
+        );
+
+        assert_eq!(request.checkpoint_kind, CheckpointKind::Human);
+        assert_eq!(request.agent_id, None);
+        assert_eq!(request.path_role, PreparedPathRole::WillEdit);
+        assert_eq!(request.files.len(), 1);
+        assert_eq!(
+            request.files[0].path,
+            std::path::PathBuf::from("src/main.rs")
+        );
+        assert_eq!(request.files[0].content.as_deref(), Some("fn main() {}\n"));
+    }
+
+    #[test]
+    fn ai_replay_checkpoint_request_preserves_active_bash_agent_identity() {
+        let agent_id = AgentId {
+            tool: "claude".to_string(),
+            id: "session-123".to_string(),
+            model: "opus-4".to_string(),
+        };
+        let metadata = HashMap::from([("edit_kind".to_string(), "bash".to_string())]);
+
+        let request = build_replay_checkpoint_request(
+            "/repo",
+            vec!["src/main.rs".to_string()],
+            HashMap::from([("src/main.rs".to_string(), "fn main() {}\n".to_string())]),
+            CheckpointKind::AiAgent,
+            Some(agent_id.clone()),
+            PreparedPathRole::Edited,
+            metadata.clone(),
+        );
+
+        assert_eq!(request.checkpoint_kind, CheckpointKind::AiAgent);
+        assert_eq!(request.agent_id, Some(agent_id));
+        assert_eq!(request.path_role, PreparedPathRole::Edited);
+        assert_eq!(request.metadata, metadata);
     }
 
     #[test]
