@@ -340,7 +340,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:GIT_AI_LOCAL_BINARY)) {
 }
 
 # ============================================================
-# Block installation as Administrator unless explicitly opted in.
+# Warn when installing as Administrator (a future version will block).
 # Running elevated creates files that normal-user processes
 # cannot access, causing persistent daemon lock failures.
 # ============================================================
@@ -360,19 +360,16 @@ if ($isElevated -and $env:GIT_AI_ALLOW_SUPERUSER -ne '1') {
 
     if (-not $isCi) {
         Write-Host ''
-        Write-Host 'Error: git-ai should not be installed as Administrator.' -ForegroundColor Red
+        Write-Host 'Warning: installing git-ai as Administrator is deprecated.' -ForegroundColor Yellow
         Write-Host ''
-        Write-Host 'Installing with elevated privileges creates files owned by Administrator'
-        Write-Host 'that become inaccessible to your normal user account, causing persistent'
-        Write-Host 'daemon lock failures.'
+        Write-Host 'A future version will refuse to install with elevated privileges because'
+        Write-Host 'it creates files owned by Administrator that become inaccessible to your'
+        Write-Host 'normal user account, causing persistent daemon lock failures.'
         Write-Host ''
-        Write-Host 'Instead, run this installer from a normal (non-elevated) PowerShell window.'
+        Write-Host 'To suppress this warning, either:'
+        Write-Host '  - Run this installer from a normal (non-elevated) PowerShell window (recommended), or'
+        Write-Host '  - Set $env:GIT_AI_ALLOW_SUPERUSER = "1"' -ForegroundColor Yellow
         Write-Host ''
-        Write-Host 'To override this check (not recommended):'
-        Write-Host '  $env:GIT_AI_ALLOW_SUPERUSER = "1"' -ForegroundColor Yellow
-        Write-Host '  irm https://usegitai.com/install.ps1 | iex' -ForegroundColor Yellow
-        Write-Host ''
-        exit 1
     }
     # Propagate to child git-ai invocations (install-hooks, exchange-nonce, login)
     $env:GIT_AI_ALLOW_SUPERUSER = '1'

@@ -35,9 +35,9 @@ fn superuser_guard_exempt_commands_always_work() {
 
 #[test]
 #[cfg(unix)]
-fn superuser_guard_blocks_when_running_as_root_without_opt_in() {
+fn superuser_guard_warns_when_running_as_root_without_opt_in() {
     if unsafe { libc::geteuid() } != 0 {
-        // Can't test blocking behavior as non-root; skip.
+        // Can't test warning behavior as non-root; skip.
         return;
     }
 
@@ -47,14 +47,10 @@ fn superuser_guard_blocks_when_running_as_root_without_opt_in() {
     remove_all_ci_env_vars(&mut cmd);
     let output = cmd.output().expect("failed to execute binary");
 
-    assert!(
-        !output.status.success(),
-        "should fail when running as root without opt-in"
-    );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("should not be run with elevated privileges"),
-        "should show superuser error message, got: {stderr}"
+        stderr.contains("running as superuser (root/Administrator) is deprecated"),
+        "should show deprecation warning when running as root without opt-in, got: {stderr}"
     );
 }
 
@@ -87,12 +83,12 @@ fn superuser_guard_allows_root_with_env_var_opt_in() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        !stderr.contains("should not be run with elevated privileges"),
-        "should NOT block when GIT_AI_ALLOW_SUPERUSER=1 is set, got: {stderr}"
+        !stderr.contains("is deprecated"),
+        "should NOT show deprecation warning when GIT_AI_ALLOW_SUPERUSER=1 is set, got: {stderr}"
     );
     assert!(
-        stderr.contains("warning: running as superuser"),
-        "should show warning when running as root with opt-in, got: {stderr}"
+        stderr.contains("warning: running as superuser (GIT_AI_ALLOW_SUPERUSER is set)"),
+        "should show opt-in acknowledgment when running as root with GIT_AI_ALLOW_SUPERUSER, got: {stderr}"
     );
 }
 
@@ -115,8 +111,8 @@ fn superuser_guard_allows_root_in_ci_environment() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        !stderr.contains("should not be run with elevated privileges"),
-        "should NOT block in CI environment, got: {stderr}"
+        !stderr.contains("is deprecated"),
+        "should NOT show deprecation warning in CI environment, got: {stderr}"
     );
     assert!(
         !stderr.contains("warning: running as superuser"),

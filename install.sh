@@ -170,7 +170,7 @@ detect_all_shells() {
 }
 
 # ============================================================
-# Block installation as root/sudo unless explicitly opted in.
+# Warn when installing as root/sudo (a future version will block).
 # Running as root creates files that normal-user processes
 # cannot access, causing persistent daemon lock failures.
 # ============================================================
@@ -188,17 +188,16 @@ if [ "$(id -u)" = "0" ] && [ "${GIT_AI_ALLOW_SUPERUSER:-}" != "1" ]; then
 
     if [ "$IS_CI_OR_MDM" = "false" ]; then
         echo ""
-        echo -e "${RED}Error: git-ai should not be installed as root/sudo.${NC}"
+        echo -e "${YELLOW}Warning: installing git-ai as root/sudo is deprecated.${NC}"
         echo ""
-        echo "Installing as superuser creates files owned by root that become"
-        echo "inaccessible to your normal user account, causing persistent failures."
+        echo "A future version will refuse to install with elevated privileges because"
+        echo "it creates files owned by root that become inaccessible to your normal"
+        echo "user account, causing persistent daemon lock failures."
         echo ""
-        echo "Instead, run this installer as your normal user (without sudo)."
+        echo "To suppress this warning, either:"
+        echo "  - Run this installer as your normal user (recommended), or"
+        echo "  - Set GIT_AI_ALLOW_SUPERUSER=1"
         echo ""
-        echo "To override this check (not recommended):"
-        echo "  GIT_AI_ALLOW_SUPERUSER=1 curl -fsSL https://usegitai.com/install.sh | bash"
-        echo ""
-        exit 1
     fi
     # Propagate to child git-ai invocations (install-hooks, exchange-nonce, login)
     export GIT_AI_ALLOW_SUPERUSER=1

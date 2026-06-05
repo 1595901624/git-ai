@@ -263,13 +263,14 @@ pub fn superuser_is_allowed() -> bool {
 pub enum SuperuserCheckResult {
     Allowed,
     AllowedWithWarning,
-    Blocked,
+    WarnFutureBlock,
 }
 
-/// Checks whether the current process should be blocked from running due to
-/// elevated privileges. Returns `Allowed` if not superuser or in CI/agent
-/// environments. Returns `AllowedWithWarning` if user explicitly opted in.
-/// Returns `Blocked` otherwise.
+/// Checks whether the current process is running with elevated privileges.
+/// Returns `Allowed` if not superuser or in CI/agent environments.
+/// Returns `AllowedWithWarning` if user explicitly opted in.
+/// Returns `WarnFutureBlock` if running as superuser without opt-in (warn-only
+/// for now; a future version will block).
 pub fn check_superuser_guard() -> SuperuserCheckResult {
     if !is_running_as_superuser() {
         return SuperuserCheckResult::Allowed;
@@ -280,26 +281,23 @@ pub fn check_superuser_guard() -> SuperuserCheckResult {
     if superuser_is_allowed() {
         return SuperuserCheckResult::AllowedWithWarning;
     }
-    SuperuserCheckResult::Blocked
+    SuperuserCheckResult::WarnFutureBlock
 }
 
-pub fn print_superuser_error_and_exit() -> ! {
+pub fn print_superuser_deprecation_warning() {
     eprintln!(
-        "error: git-ai should not be run with elevated privileges (root/Administrator).\n\
+        "[git-ai] warning: running as superuser (root/Administrator) is deprecated.\n\
          \n\
-         Running as superuser creates files owned by root that become inaccessible\n\
-         to your normal user account, causing persistent daemon lock failures.\n\
+         A future version of git-ai will refuse to run with elevated privileges\n\
+         because it creates files owned by root that become inaccessible to your\n\
+         normal user account, causing persistent daemon lock failures.\n\
          \n\
-         To fix this:\n\
-         1. Stop any running git-ai processes\n\
-         2. Remove ~/.git-ai and reinstall as your normal user\n\
+         To suppress this warning, either:\n\
+         - Run git-ai as your normal user (recommended), or\n\
+         - Set GIT_AI_ALLOW_SUPERUSER=1 or add \"allow_superuser\": true to ~/.git-ai/config.json\n\
          \n\
-         To override this check (not recommended):\n\
-         \x20 export GIT_AI_ALLOW_SUPERUSER=1\n\
-         \n\
-         This check is automatically skipped in CI environments."
+         This warning is automatically suppressed in CI environments."
     );
-    std::process::exit(1);
 }
 
 /// A cross-platform exclusive file lock.
