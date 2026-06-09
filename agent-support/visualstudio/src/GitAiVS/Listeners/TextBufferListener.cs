@@ -119,7 +119,6 @@ namespace GitAiVS.Listeners
                 if (t.IsCanceled) return;
 
                 _pendingCheckpoints.TryRemove(filePath, out CancellationTokenSource _);
-                _beforeEditTriggered.TryRemove(filePath, out long _);
 
                 var contentAfterEdit = buffer.CurrentSnapshot.GetText();
                 var relativePath = GitRepoResolver.ToRelativePath(filePath, workspaceRoot);
