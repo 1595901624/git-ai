@@ -34,6 +34,15 @@ namespace GitAiVS.Tests
         }
 
         [TestMethod]
+        public void ToRelativePathReturnsAbsoluteForSiblingWithSharedPrefix()
+        {
+            var result = GitRepoResolver.ToRelativePath(
+                @"C:\Users\dev\projects\file.txt",
+                @"C:\Users\dev\project");
+            Assert.AreEqual(@"C:\Users\dev\projects\file.txt", result);
+        }
+
+        [TestMethod]
         public void ToRelativePathHandlesUnixPaths()
         {
             var result = GitRepoResolver.ToRelativePath(

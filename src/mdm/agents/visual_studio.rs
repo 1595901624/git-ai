@@ -10,6 +10,9 @@ pub struct VisualStudioInstaller;
 /// VSIX Identity Id from source.extension.vsixmanifest.
 const VSIX_IDENTITY_ID: &str = "GitAiVS.A1B2C3D4-E5F6-7890-ABCD-EF1234567890";
 
+/// Visual Studio extension manifests can be nested as publisher/name/version.
+const MAX_EXTENSION_MANIFEST_DEPTH: usize = 3;
+
 /// Marketplace URL for manual installation fallback.
 const MARKETPLACE_URL: &str =
     "https://marketplace.visualstudio.com/items?itemName=git-ai.git-ai-visualstudio";
@@ -293,30 +296,27 @@ fn is_extension_installed(inst: &VsInstallation) -> bool {
         return false;
     }
 
-    // Walk the extensions directory looking for our extension manifest
-    if let Ok(entries) = std::fs::read_dir(&extensions_dir) {
-        for entry in entries.flatten() {
-            let entry_path = entry.path();
-            let manifest = entry_path.join("extension.vsixmanifest");
-            if manifest_contains_extension(&manifest) {
-                return true;
-            }
+    extension_dir_contains_extension(&extensions_dir, MAX_EXTENSION_MANIFEST_DEPTH)
+}
 
-            // Check subdirectories (extensions can be nested one level)
-            if entry_path.is_dir()
-                && let Ok(sub_entries) = std::fs::read_dir(entry_path)
-            {
-                for sub in sub_entries.flatten() {
-                    let sub_manifest = sub.path().join("extension.vsixmanifest");
-                    if manifest_contains_extension(&sub_manifest) {
-                        return true;
-                    }
-                }
-            }
-        }
+fn extension_dir_contains_extension(dir: &std::path::Path, remaining_depth: usize) -> bool {
+    let manifest = dir.join("extension.vsixmanifest");
+    if manifest_contains_extension(&manifest) {
+        return true;
     }
 
-    false
+    if remaining_depth == 0 {
+        return false;
+    }
+
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+
+    entries.flatten().any(|entry| {
+        let entry_path = entry.path();
+        entry_path.is_dir() && extension_dir_contains_extension(&entry_path, remaining_depth - 1)
+    })
 }
 
 fn manifest_contains_extension(manifest: &std::path::Path) -> bool {
@@ -452,5 +452,55 @@ mod tests {
         "#;
 
         assert!(!manifest_declares_vsix_identity(manifest));
+    }
+
+    #[test]
+    fn test_extension_dir_contains_manifest_nested_three_levels() {
+        let temp = tempfile::tempdir().unwrap();
+        write_vsix_manifest(
+            &temp
+                .path()
+                .join("git-ai")
+                .join("git-ai-visualstudio")
+                .join("0.1.0"),
+        );
+
+        assert!(extension_dir_contains_extension(
+            temp.path(),
+            MAX_EXTENSION_MANIFEST_DEPTH
+        ));
+    }
+
+    #[test]
+    fn test_extension_dir_does_not_search_past_three_levels() {
+        let temp = tempfile::tempdir().unwrap();
+        write_vsix_manifest(
+            &temp
+                .path()
+                .join("git-ai")
+                .join("git-ai-visualstudio")
+                .join("0.1.0")
+                .join("extra"),
+        );
+
+        assert!(!extension_dir_contains_extension(
+            temp.path(),
+            MAX_EXTENSION_MANIFEST_DEPTH
+        ));
+    }
+
+    fn write_vsix_manifest(dir: &std::path::Path) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(
+            dir.join("extension.vsixmanifest"),
+            r#"
+                <PackageManifest>
+                  <Metadata>
+                    <Identity Id="GitAiVS.A1B2C3D4-E5F6-7890-ABCD-EF1234567890" Version="0.1.0" />
+                  </Metadata>
+                </PackageManifest>
+            "#,
+        )
+        .unwrap();
     }
 }
