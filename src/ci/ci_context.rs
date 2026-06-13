@@ -822,7 +822,8 @@ fn ensure_commit_available_for_sync(
     fetch_ref: &str,
     skip_fetch: bool,
 ) -> Result<(), GitAiError> {
-    if repo.revparse_single(commit_sha).is_ok() {
+    let commit_spec = format!("{}^{{commit}}", commit_sha);
+    if repo.revparse_single(&commit_spec).is_ok() {
         return Ok(());
     }
     if skip_fetch {
@@ -842,7 +843,7 @@ fn ensure_commit_available_for_sync(
     args.push(fetch_remote.to_string());
     args.push(format!("{}:{}", commit_sha, fetch_ref));
     exec_git(&args)?;
-    repo.revparse_single(commit_sha)?;
+    repo.revparse_single(&commit_spec)?;
     Ok(())
 }
 
