@@ -483,9 +483,7 @@ mod tests {
 
     #[test]
     fn notes_mutating_subcommands_are_not_read_only_invocations() {
-        for subcommand in &[
-            "add", "append", "copy", "edit", "merge", "prune", "remove",
-        ] {
+        for subcommand in &["add", "append", "copy", "edit", "merge", "prune", "remove"] {
             assert!(
                 !is_definitely_read_only_git_invocation("notes", &[subcommand.to_string()]),
                 "git notes {subcommand:?} should not be read-only"
