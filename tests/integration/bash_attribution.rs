@@ -175,6 +175,108 @@ fn test_codex_preset_bash_recovery_minimizes_dirty_untracked_attribution() {
 }
 
 #[test]
+fn test_bash_recovery_does_not_attribute_manual_edit_after_unrelated_bash() {
+    let (_bash_db_dir, bash_db_path) = isolated_bash_history_db_path();
+    let env = [("GIT_AI_TEST_BASH_CHECKPOINT_DB_PATH", bash_db_path.as_str())];
+    let repo = TestRepo::new_with_daemon_env(&env);
+    let repo_root = repo.canonical_path();
+    set_daemon_socket_for_test(repo.daemon_control_socket_path());
+
+    repo.git(&["commit", "--allow-empty", "-m", "initial"])
+        .expect("initial commit should succeed");
+
+    let agent = AgentId {
+        tool: "codex".to_string(),
+        id: "manual-after-bash-session".to_string(),
+        model: "gpt-5".to_string(),
+    };
+
+    handle_bash_pre_tool_use_with_context(
+        &repo_root,
+        "manual-after-bash-session",
+        "manual-after-bash-tool-1",
+        &agent,
+        None,
+        "t_manualpre000",
+        Some("true"),
+    )
+    .expect("pre bash hook should record durable start");
+
+    let post_result = handle_bash_post_tool_use(
+        &repo_root,
+        "manual-after-bash-session",
+        "manual-after-bash-tool-1",
+        &agent,
+        None,
+        "t_manualpost00",
+        Some("true"),
+    )
+    .expect("post bash hook should record durable end");
+    assert!(
+        matches!(post_result.action, BashCheckpointAction::NoChanges),
+        "bash call should not emit a normal checkpoint"
+    );
+
+    fs::write(repo_root.join("manual-after.txt"), "manual after bash\n").unwrap();
+    repo.stage_all_and_commit("Manual edit after bash").unwrap();
+
+    let mut file = repo.filename("manual-after.txt");
+    file.assert_committed_lines(lines!["manual after bash".unattributed_human()]);
+}
+
+#[test]
+fn test_bash_recovery_does_not_attribute_manual_edit_before_unrelated_bash() {
+    let (_bash_db_dir, bash_db_path) = isolated_bash_history_db_path();
+    let env = [("GIT_AI_TEST_BASH_CHECKPOINT_DB_PATH", bash_db_path.as_str())];
+    let repo = TestRepo::new_with_daemon_env(&env);
+    let repo_root = repo.canonical_path();
+    set_daemon_socket_for_test(repo.daemon_control_socket_path());
+
+    repo.git(&["commit", "--allow-empty", "-m", "initial"])
+        .expect("initial commit should succeed");
+
+    fs::write(repo_root.join("manual-before.txt"), "manual before bash\n").unwrap();
+
+    let agent = AgentId {
+        tool: "codex".to_string(),
+        id: "manual-before-bash-session".to_string(),
+        model: "gpt-5".to_string(),
+    };
+
+    handle_bash_pre_tool_use_with_context(
+        &repo_root,
+        "manual-before-bash-session",
+        "manual-before-bash-tool-1",
+        &agent,
+        None,
+        "t_manualbefpre",
+        Some("true"),
+    )
+    .expect("pre bash hook should record durable start");
+
+    let post_result = handle_bash_post_tool_use(
+        &repo_root,
+        "manual-before-bash-session",
+        "manual-before-bash-tool-1",
+        &agent,
+        None,
+        "t_manualbefpst",
+        Some("true"),
+    )
+    .expect("post bash hook should record durable end");
+    assert!(
+        matches!(post_result.action, BashCheckpointAction::NoChanges),
+        "bash call should not emit a normal checkpoint"
+    );
+
+    repo.stage_all_and_commit("Manual edit before bash")
+        .unwrap();
+
+    let mut file = repo.filename("manual-before.txt");
+    file.assert_committed_lines(lines!["manual before bash".unattributed_human()]);
+}
+
+#[test]
 fn test_bash_history_recovers_untracked_lines_when_post_snapshot_fails() {
     let (_bash_db_dir, bash_db_path) = isolated_bash_history_db_path();
     let env = [("GIT_AI_TEST_BASH_CHECKPOINT_DB_PATH", bash_db_path.as_str())];
