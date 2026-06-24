@@ -246,6 +246,7 @@ fn post_squash_resolution_working_log(
         crate::authorship::post_commit::PostCommitOptions {
             supress_output: true,
             compute_stats: false,
+            recover_attribution: false,
         },
         move |resolution_log| {
             Ok(

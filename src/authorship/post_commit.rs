@@ -87,6 +87,7 @@ pub fn post_commit_from_working_log(
 pub(crate) struct PostCommitOptions {
     pub supress_output: bool,
     pub compute_stats: bool,
+    pub recover_attribution: bool,
 }
 
 pub fn post_commit_from_working_log_with_transform<F>(
@@ -108,6 +109,7 @@ where
         PostCommitOptions {
             supress_output,
             compute_stats: true,
+            recover_attribution: true,
         },
         transform,
     )
@@ -254,6 +256,26 @@ where
 
     authorship_log = transform(authorship_log)?;
     authorship_log.metadata.base_commit_sha = commit_sha.clone();
+
+    if options.recover_attribution {
+        let recovery_hunks =
+            recovery_committed_hunks(repo, &parent_sha, &commit_sha, precomputed_parent_diff)?;
+        crate::authorship::attribution_recovery::recover_attribution(
+            repo,
+            &parent_sha,
+            &commit_sha,
+            &human_author,
+            &mut authorship_log,
+            &recovery_hunks,
+            Some(
+                crate::authorship::attribution_recovery::RecoveryWorkingLogContext {
+                    working_log: &working_log,
+                    parent_checkpoints: &parent_working_log,
+                },
+            ),
+        )?;
+        authorship_log.metadata.base_commit_sha = commit_sha.clone();
+    }
 
     // Long-lived daemon processes should read a fresh config snapshot.
     // Always use Config::fresh() to support runtime config updates
@@ -433,6 +455,36 @@ fn commit_tree_snapshot_for_files(
     Ok(snapshot)
 }
 
+fn recovery_committed_hunks(
+    repo: &Repository,
+    parent_sha: &str,
+    commit_sha: &str,
+    precomputed_parent_diff: Option<&crate::authorship::rewrite::DiffTreeResult>,
+) -> Result<HashMap<String, Vec<crate::authorship::authorship_log::LineRange>>, GitAiError> {
+    if let Some(diff) = precomputed_parent_diff {
+        return Ok(
+            crate::authorship::virtual_attribution::committed_hunks_from_diff_result(diff, None),
+        );
+    }
+
+    let diff_base = if parent_sha == "initial" {
+        "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    } else {
+        parent_sha
+    };
+    let added_lines = repo.diff_added_lines(diff_base, commit_sha, None)?;
+    Ok(added_lines
+        .into_iter()
+        .filter(|(_, lines)| !lines.is_empty())
+        .map(|(path, lines)| {
+            (
+                path,
+                crate::authorship::authorship_log::LineRange::compress_lines(&lines),
+            )
+        })
+        .collect())
+}
+
 /// Amend-specific post-commit that merges blame-sourced attributions from the
 /// original commit with persisted working-log checkpoint data.
 pub fn post_commit_amend(
@@ -443,6 +495,7 @@ pub fn post_commit_amend(
 ) -> Result<(String, AuthorshipLog), GitAiError> {
     let repo_storage = &repo.storage;
     let working_log = repo_storage.working_log_for_base_commit(original_commit)?;
+    let parent_working_log = working_log.read_all_checkpoints()?;
 
     // Compute pathspecs: changed files in the amended commit + working log touched files
     let changed_files = repo.list_commit_files(amended_commit, None)?;
@@ -539,6 +592,23 @@ pub fn post_commit_amend(
             );
         }
     }
+
+    let recovery_hunks = recovery_committed_hunks(repo, &parent_sha, amended_commit, None)?;
+    crate::authorship::attribution_recovery::recover_attribution(
+        repo,
+        &parent_sha,
+        amended_commit,
+        &human_author,
+        &mut authorship_log,
+        &recovery_hunks,
+        Some(
+            crate::authorship::attribution_recovery::RecoveryWorkingLogContext {
+                working_log: &working_log,
+                parent_checkpoints: &parent_working_log,
+            },
+        ),
+    )?;
+    authorship_log.metadata.base_commit_sha = amended_commit.to_string();
 
     // Preserve human/session metadata from the original commit's note
     if let Ok(original_log) =
