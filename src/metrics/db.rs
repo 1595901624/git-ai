@@ -1100,19 +1100,29 @@ fn metric_row_is_older_than_cutoff(
         return (ts as u64) < cutoff;
     }
 
-    if let Some(metadata) = extract_metric_event_metadata(event_json) {
-        return u64::from(metadata.event_ts) < cutoff;
+    if let Some(ts) = extract_metric_event_ts(event_json) {
+        return u64::from(ts) < cutoff;
     }
 
     delivered_ts.is_some_and(|ts| ts >= 0 && (ts as u64) < cutoff)
 }
 
-fn extract_metric_event_metadata(event_json: &str) -> Option<MetricEventMetadata> {
+fn extract_metric_event_ts(event_json: &str) -> Option<u32> {
     let value: Value = serde_json::from_str(event_json).ok()?;
-    let event_ts = value
+    extract_metric_event_ts_from_value(&value)
+}
+
+fn extract_metric_event_ts_from_value(value: &Value) -> Option<u32> {
+    value
         .get("t")
         .and_then(Value::as_u64)
-        .filter(|ts| *ts <= u32::MAX as u64)? as u32;
+        .filter(|ts| *ts <= u32::MAX as u64)
+        .map(|ts| ts as u32)
+}
+
+fn extract_metric_event_metadata(event_json: &str) -> Option<MetricEventMetadata> {
+    let value: Value = serde_json::from_str(event_json).ok()?;
+    let event_ts = extract_metric_event_ts_from_value(&value)?;
     let event_kind = value
         .get("e")
         .and_then(Value::as_u64)
@@ -1763,10 +1773,11 @@ mod tests {
     #[test]
     fn test_insert_events_leaves_event_metadata_null_for_invalid_json() {
         let (mut db, _temp_dir) = create_test_db();
+        let recent_event_ts = days_ago(1);
         let events = vec![
             "not-json".to_string(),
-            r#"{"t":1700000000,"v":{},"a":{}}"#.to_string(),
-            r#"{"t":1700000000,"e":null,"v":{},"a":{}}"#.to_string(),
+            format!(r#"{{"t":{recent_event_ts},"v":{{}},"a":{{}}}}"#),
+            format!(r#"{{"t":{recent_event_ts},"e":null,"v":{{}},"a":{{}}}}"#),
         ];
 
         db.insert_events(&events).unwrap();
@@ -2365,6 +2376,31 @@ mod tests {
         let batch = pending_event_jsons(&db);
         assert_eq!(batch.len(), 1);
         assert!(batch[0].contains(&format!("\"t\":{recent_event_ts}")));
+    }
+
+    #[test]
+    fn test_prunes_pending_rows_with_timestamp_even_when_kind_is_missing() {
+        let (mut db, _temp_dir) = create_test_db();
+
+        let old_event_ts = seconds_ago(MetricsDatabase::METRICS_RETENTION_SECS + 1);
+        let recent_event_ts = days_ago(1);
+        let pending = vec![
+            format!(r#"{{"t":{old_event_ts},"v":{{}},"a":{{}}}}"#),
+            format!(r#"{{"t":{recent_event_ts},"v":{{}},"a":{{}}}}"#),
+        ];
+
+        db.insert_events(&pending).unwrap();
+
+        let total: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM metrics", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(total, 1);
+        let remaining: String = db
+            .conn
+            .query_row("SELECT event_json FROM metrics", [], |row| row.get(0))
+            .unwrap();
+        assert!(remaining.contains(&format!("\"t\":{recent_event_ts}")));
     }
 
     #[test]
