@@ -2296,6 +2296,16 @@ const COMMIT_FILE_TIMESTAMP_SNAPSHOT_WAIT: Duration = Duration::from_millis(500)
 const SESSION_EVENT_RECOVERY_PREFLIGHT_WAIT: Duration = Duration::from_secs(2);
 const SESSION_EVENT_RECOVERY_PREFLIGHT_POLL: Duration = Duration::from_millis(100);
 
+fn run_blocking_side_effect<T>(operation: impl FnOnce() -> T) -> T {
+    if tokio::runtime::Handle::try_current()
+        .is_ok_and(|handle| handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread)
+    {
+        tokio::task::block_in_place(operation)
+    } else {
+        operation()
+    }
+}
+
 #[derive(Debug, Clone)]
 struct PendingSquashMerge {
     source_head: String,
@@ -2503,17 +2513,19 @@ impl ActorDaemonCoordinator {
     fn trigger_transcript_sweep_for_recovery(
         &self,
         trigger: crate::daemon::stream_worker::SweepTrigger,
-    ) {
+    ) -> Option<std::sync::mpsc::Receiver<Result<(), String>>> {
         let Some(worker) = &self.stream_worker else {
             tracing::debug!(trigger = %trigger, "recovery transcript sweep skipped; worker is not running");
-            return;
+            return None;
         };
 
-        if worker.trigger_sweep_for_recovery(trigger) {
+        let completion = worker.trigger_sweep_for_recovery(trigger);
+        if completion.is_some() {
             tracing::info!(trigger = %trigger, "recovery transcript sweep enqueued");
         } else {
             tracing::debug!(trigger = %trigger, "recovery transcript sweep not enqueued");
         }
+        completion
     }
 
     fn wait_for_session_event_recovery_candidate(
@@ -2594,13 +2606,55 @@ impl ActorDaemonCoordinator {
             return;
         }
 
-        self.trigger_transcript_sweep_for_recovery(
+        let deadline = std::time::Instant::now() + SESSION_EVENT_RECOVERY_PREFLIGHT_WAIT;
+        let sweep_completion = self.trigger_transcript_sweep_for_recovery(
             crate::daemon::stream_worker::SweepTrigger::PostCommit,
         );
 
-        let deadline = std::time::Instant::now() + SESSION_EVENT_RECOVERY_PREFLIGHT_WAIT;
+        if let Some(sweep_completion) = sweep_completion {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                tracing::debug!(
+                    wait_ms = SESSION_EVENT_RECOVERY_PREFLIGHT_WAIT.as_millis() as u64,
+                    "recovery transcript sweep wait expired"
+                );
+                return;
+            }
+            match sweep_completion.recv_timeout(remaining) {
+                Ok(Ok(())) => {
+                    tracing::debug!("recovery transcript sweep completed before post-commit");
+                }
+                Ok(Err(error)) => {
+                    tracing::debug!(
+                        %error,
+                        "recovery transcript sweep failed before post-commit"
+                    );
+                    return;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    tracing::debug!(
+                        wait_ms = SESSION_EVENT_RECOVERY_PREFLIGHT_WAIT.as_millis() as u64,
+                        "recovery transcript sweep wait expired"
+                    );
+                    return;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    tracing::debug!("recovery transcript sweep completion channel disconnected");
+                    return;
+                }
+            }
+        }
+
         loop {
-            std::thread::sleep(SESSION_EVENT_RECOVERY_PREFLIGHT_POLL);
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                tracing::debug!(
+                    wait_ms = SESSION_EVENT_RECOVERY_PREFLIGHT_WAIT.as_millis() as u64,
+                    "session-event recovery preflight wait expired"
+                );
+                return;
+            }
+            std::thread::sleep(remaining.min(SESSION_EVENT_RECOVERY_PREFLIGHT_POLL));
             if has_candidate() {
                 tracing::debug!(
                     "session-event recovery candidate became visible before post-commit"
@@ -5284,15 +5338,20 @@ impl ActorDaemonCoordinator {
                                 );
                             };
 
-                            crate::authorship::post_commit::post_commit_from_working_log_with_recovery_timestamps(
-                                &repo,
-                                base_opt.clone(),
-                                new_head.clone(),
-                                author,
-                                true,
-                                recovery_file_timestamps.as_ref(),
-                                Some(&recovery_preflight),
-                            )?;
+                            // Post-commit note generation does synchronous git/filesystem work
+                            // and may briefly wait for transcript recovery. Mark it as blocking
+                            // so the transcript worker can process the recovery sweep promptly.
+                            run_blocking_side_effect(|| {
+                                crate::authorship::post_commit::post_commit_from_working_log_with_recovery_timestamps(
+                                    &repo,
+                                    base_opt.clone(),
+                                    new_head.clone(),
+                                    author,
+                                    true,
+                                    recovery_file_timestamps.as_ref(),
+                                    Some(&recovery_preflight),
+                                )
+                            })?;
 
                             if cmd.primary_command.as_deref() == Some("commit")
                                 && let Some(pending) = self
@@ -5340,14 +5399,19 @@ impl ActorDaemonCoordinator {
                                     unknown_by_file,
                                 );
                             };
-                            crate::authorship::post_commit::post_commit_amend_with_recovery_timestamps(
-                                &repo,
-                                old_head,
-                                new_head,
-                                author,
-                                recovery_file_timestamps.as_ref(),
-                                Some(&recovery_preflight),
-                            )?;
+                            // Post-commit note generation does synchronous git/filesystem work
+                            // and may briefly wait for transcript recovery. Mark it as blocking
+                            // so the transcript worker can process the recovery sweep promptly.
+                            run_blocking_side_effect(|| {
+                                crate::authorship::post_commit::post_commit_amend_with_recovery_timestamps(
+                                    &repo,
+                                    old_head,
+                                    new_head,
+                                    author,
+                                    recovery_file_timestamps.as_ref(),
+                                    Some(&recovery_preflight),
+                                )
+                            })?;
                         }
                     }
                     crate::daemon::domain::SemanticEvent::Reset {
