@@ -9,14 +9,18 @@ This document describes the Git AI client-side daemon diagnostics upload path.
   the existing API client/auth headers.
 - A heartbeat event is generated roughly every 15 minutes while the daemon is
   running.
-- Upload is best-effort. Failed batches are retried from the bounded in-memory
-  buffer; if the buffer exceeds its cap, the oldest events are dropped.
-- Events are dropped without retry when upload is disabled or the current API
-  auth/configuration does not permit upload.
+- Upload is best-effort and fire-and-forget. The telemetry worker dispatches at
+  most one daemon-log upload at a time on a detached thread and does not await
+  endpoint availability.
+- If another daemon-log upload is already in flight, the current batch is
+  requeued into the bounded in-memory buffer. If the buffer exceeds its cap, the
+  oldest events are dropped.
+- Events are dropped without retry when upload is disabled, the current API
+  auth/configuration does not permit upload, or a dispatched upload fails.
 - `feature_flags.daemon_log_upload` disables capture and upload when set to
   `false`. The flag defaults to enabled in debug and release builds.
 - Each event keeps at most 64 structured fields. Field names and string values
-  are length-limited before buffering.
+  are bounded, secret-redacted, and length-limited before buffering.
 
 ## Endpoint
 
