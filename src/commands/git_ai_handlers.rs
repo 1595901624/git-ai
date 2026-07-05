@@ -323,7 +323,8 @@ fn print_help() {
         "    --hook-input <json|stdin>   JSON payload required by presets, or 'stdin' to read from stdin"
     );
     eprintln!("    human [pathspecs...]             Untracked/legacy human checkpoint");
-    eprintln!("    mock_ai [pathspecs...]           Test preset accepting optional file pathspecs");
+    eprintln!("    mock_ai [--tool <tool>] [--id <id>] [--model <model>] [pathspecs...]");
+    eprintln!("                                      Test preset with optional AgentId fields");
     eprintln!("    mock_known_human [pathspecs...]  Test preset for KnownHuman checkpoints");
     eprintln!("  log [args...]      Show commit log with AI authorship stats");
     eprintln!("                        Use --raw or --notes to include raw authorship note data");
@@ -1055,7 +1056,7 @@ fn handle_git_hooks(args: &[String]) {
 /// invoked without --hook-input.
 fn synthesize_hook_input_from_cli_args(preset_name: &str, remaining_args: &[String]) -> String {
     match preset_name {
-        "human" | "mock_ai" | "mock_known_human" => {
+        "human" | "mock_known_human" => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let mut paths: Vec<String> = remaining_args
                 .iter()
@@ -1075,6 +1076,64 @@ fn synthesize_hook_input_from_cli_args(preset_name: &str, remaining_args: &[Stri
             serde_json::json!({
                 "file_paths": paths,
                 "cwd": cwd.to_string_lossy(),
+            })
+            .to_string()
+        }
+        "mock_ai" => {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let mut tool = None;
+            let mut id = None;
+            let mut model = None;
+            let mut paths = Vec::new();
+            let mut i = 0usize;
+            while i < remaining_args.len() {
+                match remaining_args[i].as_str() {
+                    "--tool" if i + 1 < remaining_args.len() => {
+                        tool = Some(remaining_args[i + 1].clone());
+                        i += 2;
+                    }
+                    "--id" if i + 1 < remaining_args.len() => {
+                        id = Some(remaining_args[i + 1].clone());
+                        i += 2;
+                    }
+                    "--model" if i + 1 < remaining_args.len() => {
+                        model = Some(remaining_args[i + 1].clone());
+                        i += 2;
+                    }
+                    "--" => {
+                        paths.extend(remaining_args[i + 1..].iter().map(|s| {
+                            let p = std::path::Path::new(s.as_str());
+                            if p.is_absolute() {
+                                s.clone()
+                            } else {
+                                cwd.join(p).to_string_lossy().to_string()
+                            }
+                        }));
+                        break;
+                    }
+                    arg if !arg.starts_with("--") => {
+                        let p = std::path::Path::new(arg);
+                        if p.is_absolute() {
+                            paths.push(arg.to_string());
+                        } else {
+                            paths.push(cwd.join(p).to_string_lossy().to_string());
+                        }
+                        i += 1;
+                    }
+                    _ => {
+                        i += 1;
+                    }
+                }
+            }
+            if paths.is_empty() {
+                paths = discover_dirty_files_from_status(&cwd);
+            }
+            serde_json::json!({
+                "file_paths": paths,
+                "cwd": cwd.to_string_lossy(),
+                "tool": tool,
+                "id": id,
+                "model": model,
             })
             .to_string()
         }

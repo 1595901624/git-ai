@@ -1,3 +1,4 @@
+use crate::repos::test_file::ExpectedLineExt;
 use crate::repos::test_repo::TestRepo;
 use std::fs;
 
@@ -46,6 +47,63 @@ fn test_explicit_path_checkpoint_only_tracks_the_explicit_file() {
         vec!["alphabet.md"],
         "explicit path checkpoints must not expand to other dirty AI-touched files"
     );
+}
+
+#[test]
+fn test_mock_ai_checkpoint_accepts_agent_id_arguments() {
+    let repo = TestRepo::new();
+    let file_path = repo.path().join("agent.txt");
+    let mut file = repo.filename("agent.txt");
+
+    fs::write(&file_path, "base\n").expect("failed to write agent.txt");
+    repo.stage_all_and_commit("initial commit")
+        .expect("initial commit should succeed");
+    file.assert_committed_lines(crate::lines!["base".unattributed_human()]);
+
+    repo.git_ai(&["checkpoint", "human", "agent.txt"])
+        .expect("pre-edit checkpoint should succeed");
+    fs::write(&file_path, "base\ncustom agent line\n").expect("failed to update agent.txt");
+    repo.git_ai(&[
+        "checkpoint",
+        "mock_ai",
+        "agent.txt",
+        "--tool",
+        "custom-codex",
+        "--id",
+        "test-session",
+        "--model",
+        "test-model",
+    ])
+    .expect("mock AI checkpoint with AgentId arguments should succeed");
+
+    let commit = repo
+        .stage_all_and_commit("custom agent commit")
+        .expect("custom agent commit should succeed");
+    file.assert_committed_lines(crate::lines![
+        "base".unattributed_human(),
+        "custom agent line".ai(),
+    ]);
+
+    let agent_id = commit
+        .authorship_log
+        .metadata
+        .sessions
+        .values()
+        .map(|session| &session.agent_id)
+        .chain(
+            commit
+                .authorship_log
+                .metadata
+                .prompts
+                .values()
+                .map(|prompt| &prompt.agent_id),
+        )
+        .find(|agent_id| agent_id.tool == "custom-codex")
+        .expect("custom AgentId should be stored in the authorship note");
+
+    assert_eq!(agent_id.tool, "custom-codex");
+    assert_eq!(agent_id.id, "test-session");
+    assert_eq!(agent_id.model, "test-model");
 }
 
 #[test]
