@@ -1,0 +1,67 @@
+tests/integration/checkpoint_explicit_paths.rs
+  88e5fd8d59882a86 1,52-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.0",
+  "base_commit_sha": "f998b77d6f838542bad842233388676998df5af2",
+  "prompts": {
+    "88e5fd8d59882a86": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f329a-6dc4-7ab3-a1b6-ef4005cfc5e8",
+        "model": "gpt-5.5"
+      },
+      "human_author": "luhaoyu <haoyu3@163.com>",
+      "messages": [],
+      "total_additions": 307,
+      "total_deletions": 249,
+      "accepted_lines": 183,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 141,
+    "git_diff_deleted_lines": 9,
+    "ai_additions": 8,
+    "ai_accepted": 8,
+    "BYMC": 128,
+    "mixed_additions": 0,
+    "BYAC": 8,
+    "BYRC": 0,
+    "per_file": {
+      "src/commands/checkpoint_agent/presets/mock_ai.rs": {
+        "BYMC": [
+          "20",
+          "24-26",
+          "48-64",
+          "68"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "src/commands/git_ai_handlers.rs": {
+        "BYMC": [
+          "326-327",
+          "1059",
+          "1082-1136"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "tests/integration/checkpoint_explicit_paths.rs": {
+        "BYMC": [
+          "59-106"
+        ],
+        "BYAC": [
+          "1",
+          "52-58"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "ipa_account": "luhaoyu",
+  "commit_timestamp": 1783262683,
+  "requirement_id": ""
+}
