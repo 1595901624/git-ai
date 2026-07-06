@@ -1,3 +1,0 @@
-[submodule "tests/gitflow-repo"]
-	path = tests/gitflow-repo
-	url = https://github.com/acunniffe/testing-gitflows-git-ai
