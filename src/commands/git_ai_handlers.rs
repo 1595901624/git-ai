@@ -70,6 +70,7 @@ fn print_help() {
     eprintln!("Commands:");
     eprintln!("  checkpoint         checkpoint working changes and specify author");
     eprintln!("    Presets: claude, cursor. Debug/Testing presets mock_ai");
+    eprintln!("    mock_ai [path] [--tool <tool>] [--id <id>] [--model <model>]");
     eprintln!("    --show-working-log    Display current working log");
     eprintln!("    --reset               Reset working log");
     eprintln!("  blame              [override] git blame with AI authorship tracking");
@@ -97,6 +98,8 @@ fn handle_checkpoint(args: &[String]) {
     let mut author = None;
     let mut show_working_log = false;
     let mut reset = false;
+    let mut tool = None;
+    let mut id = None;
     let mut model = None;
     let mut _prompt_json = None;
     let mut _prompt_path = None;
@@ -122,6 +125,24 @@ fn handle_checkpoint(args: &[String]) {
             "--reset" => {
                 reset = true;
                 i += 1;
+            }
+            "--tool" => {
+                if i + 1 < args.len() {
+                    tool = Some(args[i + 1].clone());
+                    i += 2;
+                } else {
+                    eprintln!("Error: --tool requires a value");
+                    std::process::exit(1);
+                }
+            }
+            "--id" => {
+                if i + 1 < args.len() {
+                    id = Some(args[i + 1].clone());
+                    i += 2;
+                } else {
+                    eprintln!("Error: --id requires a value");
+                    std::process::exit(1);
+                }
             }
             "--model" => {
                 if i + 1 < args.len() {
@@ -229,9 +250,9 @@ fn handle_checkpoint(args: &[String]) {
             "mock_ai" => {
                 agent_run_result = Some(AgentRunResult {
                     agent_id: AgentId {
-                        tool: "some-ai".to_string(),
-                        id: "ai-thread".to_string(),
-                        model: "unknown".to_string(),
+                        tool: tool.clone().unwrap_or_else(|| "some-ai".to_string()),
+                        id: id.clone().unwrap_or_else(|| "ai-thread".to_string()),
+                        model: model.clone().unwrap_or_else(|| "unknown".to_string()),
                     },
                     is_human: false,
                     transcript: None,
