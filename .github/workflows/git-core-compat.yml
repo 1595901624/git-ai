@@ -1,0 +1,93 @@
+name: Git Core Compatibility
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Taskfile.yml'
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/workflows/git-core-compat.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Taskfile.yml'
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/workflows/git-core-compat.yml'
+  merge_group:
+    branches: [main]
+
+jobs:
+  git-core-tests:
+    name: Run core Git tests with git-ai
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ubuntu-cargo-
+
+      - name: Get week for git source cache key
+        id: date
+        run: echo "week=$(date +'%Y-%U')" >> $GITHUB_OUTPUT
+
+      - name: Cache git source
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: /tmp/git-core-tests
+          key: git-source-${{ runner.os }}-${{ steps.date.outputs.week }}
+          restore-keys: |
+            git-source-${{ runner.os }}-
+
+      - name: Clone git source
+        run: |
+          if [ ! -d /tmp/git-core-tests ]; then
+            git clone --depth 1 https://github.com/git/git.git /tmp/git-core-tests
+          else
+            echo "Using cached git source"
+          fi
+
+      - name: Build git source
+        run: |
+          if [ ! -f /tmp/git-core-tests/GIT-BUILD-OPTIONS ]; then
+            make -C /tmp/git-core-tests -j$(nproc) NO_CURL=YesPlease NO_GETTEXT=YesPlease
+          else
+            echo "Using cached git build"
+          fi
+
+      - name: Build git-ai
+        run: cargo build --release --bin git-ai
+
+      - name: Run core Git compatibility tests
+        timeout-minutes: 10
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: python3 tests/git-compat/run-core-tests.py
