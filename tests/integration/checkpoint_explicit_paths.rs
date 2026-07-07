@@ -49,6 +49,44 @@ fn test_explicit_path_checkpoint_only_tracks_the_explicit_file() {
 }
 
 #[test]
+fn test_mock_ai_checkpoint_accepts_agent_id_arguments() {
+    let repo = TestRepo::new();
+    let file_path = repo.path().join("agent-id.md");
+    fs::write(&file_path, "initial\n").expect("failed to write initial agent-id.md");
+    repo.stage_all_and_commit("initial commit")
+        .expect("initial commit should succeed");
+
+    fs::write(&file_path, "line from configured mock agent\n")
+        .expect("failed to update agent-id.md");
+    repo.git_ai(&[
+        "checkpoint",
+        "mock_ai",
+        "agent-id.md",
+        "--tool",
+        "custom-tool",
+        "--id",
+        "session-123",
+        "--model",
+        "gpt-test",
+    ])
+    .expect("mock_ai checkpoint with explicit agent id should succeed");
+
+    let checkpoints = repo
+        .current_working_logs()
+        .read_all_checkpoints()
+        .expect("checkpoints should be readable");
+    let latest = checkpoints.last().expect("latest checkpoint should exist");
+    let agent_id = latest
+        .agent_id
+        .as_ref()
+        .expect("mock_ai checkpoints should include an agent id");
+
+    assert_eq!(agent_id.tool, "custom-tool");
+    assert_eq!(agent_id.id, "session-123");
+    assert_eq!(agent_id.model, "gpt-test");
+}
+
+#[test]
 fn test_explicit_path_checkpoint_records_conflicted_files() {
     let repo = TestRepo::new();
     let conflict_path = repo.path().join("conflict.txt");
