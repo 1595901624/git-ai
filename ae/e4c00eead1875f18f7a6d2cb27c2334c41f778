@@ -1,0 +1,20 @@
+.github/workflows/release-standalone.yml
+  s_6400701963d482::t_9e1da6611e2fa1 170-175,180
+  s_6400701963d482::t_2d14e14991755c 1-169,176-179,181-305
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9-1",
+  "base_commit_sha": "aee4c00eead1875f18f7a6d2cb27c2334c41f778",
+  "prompts": {},
+  "sessions": {
+    "s_6400701963d482": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f50d8-18d6-7360-ae9d-fa4b6a029644",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "luhaoyu <haoyu3@163.com>"
+    }
+  }
+}
