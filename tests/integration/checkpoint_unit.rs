@@ -70,6 +70,46 @@ fn test_checkpoint_with_staged_changes() {
 }
 
 #[test]
+fn test_checkpoint_reset_clears_current_working_log_without_changing_files() {
+    let (repo, lines_file, alphabet_file) = setup_repo_with_base_commit();
+    let lines_path = repo.path().join(&lines_file);
+    let alphabet_path = repo.path().join(&alphabet_file);
+
+    std::fs::write(&lines_path, "AI-authored change\n").unwrap();
+    std::fs::write(&alphabet_path, "Human-authored change\n").unwrap();
+    repo.git_ai(&["checkpoint", "mock_ai", &lines_file])
+        .expect("AI checkpoint should succeed");
+    repo.git_ai(&["checkpoint", "mock_known_human", &alphabet_file])
+        .expect("human checkpoint should succeed");
+
+    let working_log = repo.current_working_logs();
+    assert_eq!(
+        working_log.read_all_checkpoints().unwrap().len(),
+        2,
+        "both files should be represented in the current working log"
+    );
+
+    repo.git_ai(&["checkpoint", "--reset"])
+        .expect("reset should succeed");
+
+    assert!(
+        repo.current_working_logs()
+            .read_all_checkpoints()
+            .unwrap()
+            .is_empty(),
+        "reset should clear every checkpoint in the current working log"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&lines_path).unwrap(),
+        "AI-authored change\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&alphabet_path).unwrap(),
+        "Human-authored change\n"
+    );
+}
+
+#[test]
 fn test_checkpoint_with_staged_changes_after_previous_checkpoint() {
     // Create a repo with an initial commit
     let (repo, lines_file, _) = setup_repo_with_base_commit();

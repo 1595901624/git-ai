@@ -312,6 +312,7 @@ fn print_help() {
     eprintln!(
         "    --hook-input <json|stdin>   JSON payload required by presets, or 'stdin' to read from stdin"
     );
+    eprintln!("    --reset                     Clear the current working log");
     eprintln!("    human [pathspecs...]             Untracked/legacy human checkpoint");
     eprintln!("    mock_ai [pathspecs...] [--tool <tool>] [--id <id>] [--model <model>]");
     eprintln!(
@@ -372,6 +373,14 @@ fn print_help() {
 }
 
 fn handle_checkpoint(args: &[String]) {
+    if args.len() == 1 && args[0] == "--reset" {
+        if let Err(e) = reset_current_working_log() {
+            eprintln!("Failed to reset working log: {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let perf = std::env::var("GIT_AI_DEBUG_PERFORMANCE").is_ok_and(|v| !v.is_empty() && v != "0");
     let t0 = std::time::Instant::now();
 
@@ -557,6 +566,24 @@ fn handle_checkpoint(args: &[String]) {
             t0.elapsed().as_secs_f64() * 1000.0
         );
     }
+}
+
+/// Clears the uncommitted attribution state for the current HEAD without
+/// changing the worktree, commits, or authorship notes.
+fn reset_current_working_log() -> Result<(), crate::error::GitAiError> {
+    let repo = find_repository(&Vec::new())?;
+    let base_commit = repo
+        .head()
+        .and_then(|head| head.target())
+        .unwrap_or_else(|_| "initial".to_string());
+
+    if !repo.storage.has_working_log(&base_commit) {
+        return Ok(());
+    }
+
+    repo.storage
+        .working_log_for_base_commit(&base_commit)?
+        .reset_working_log()
 }
 
 fn strip_utf8_bom(input: String) -> String {
