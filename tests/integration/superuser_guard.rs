@@ -22,9 +22,27 @@ fn superuser_guard_allow_env_var_is_respected() {
 }
 
 #[test]
+fn real_version_prints_default_release_version() {
+    let repo = TestRepo::new();
+    let version = repo
+        .git_ai(&["real-version"])
+        .expect("real-version command should succeed");
+
+    assert_eq!(version.trim(), "1.5.9.1");
+}
+
+#[test]
 fn superuser_guard_exempt_commands_always_work() {
     let repo = TestRepo::new();
-    for cmd in ["version", "--version", "-v", "help", "--help", "-h"] {
+    for cmd in [
+        "version",
+        "--version",
+        "-v",
+        "real-version",
+        "help",
+        "--help",
+        "-h",
+    ] {
         let result = repo.git_ai(&[cmd]);
         assert!(
             result.is_ok(),

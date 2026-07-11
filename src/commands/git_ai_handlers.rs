@@ -44,6 +44,7 @@ pub fn handle_git_ai(args: &[String]) {
             | "version"
             | "--version"
             | "-v"
+            | "real-version"
             | "config"
             | "bg"
             | "d"
@@ -88,6 +89,10 @@ pub fn handle_git_ai(args: &[String]) {
             } else {
                 println!(env!("CARGO_PKG_VERSION"));
             }
+            std::process::exit(0);
+        }
+        "real-version" => {
+            println!("terra-1.5.9.1");
             std::process::exit(0);
         }
         "config" => {
@@ -367,6 +372,7 @@ fn print_help() {
     eprintln!("  logout             Clear stored credentials");
     eprintln!("  whoami             Show auth state and login identity");
     eprintln!("  version, -v, --version     Print the git-ai version");
+    eprintln!("  real-version       Print the release version");
     eprintln!("  help, -h, --help           Show this help message");
     eprintln!();
     std::process::exit(0);
