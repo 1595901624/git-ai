@@ -1,0 +1,19 @@
+tests/integration/checkpoint_unit.rs
+  s_4de4d425dd0c80::t_c6c182bf0b7b64 73-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9-1",
+  "base_commit_sha": "f9330f3bbce97220f282a42fe4e39840233a5b17",
+  "prompts": {},
+  "sessions": {
+    "s_4de4d425dd0c80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4f89-5789-7912-abfc-015b12635f0c",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "luhaoyu <haoyu3@163.com>"
+    }
+  }
+}
