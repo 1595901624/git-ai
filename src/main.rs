@@ -25,7 +25,7 @@ fn is_superuser_exempt_command(args: &[String]) -> bool {
             | "version"
             | "--version"
             | "-v"
-            | "real-version"
+            | "version-code"
             | "upgrade"
             | "debug"
             | "uninstall-hooks"

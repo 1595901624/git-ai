@@ -22,13 +22,13 @@ fn superuser_guard_allow_env_var_is_respected() {
 }
 
 #[test]
-fn real_version_prints_default_release_version() {
+fn version_code_prints_default_release_version() {
     let repo = TestRepo::new();
     let version = repo
-        .git_ai(&["real-version"])
-        .expect("real-version command should succeed");
+        .git_ai(&["version-code"])
+        .expect("version-code command should succeed");
 
-    assert_eq!(version.trim(), "1.5.9.1");
+    assert_eq!(version.trim(), "terra-1.5.9.1");
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn superuser_guard_exempt_commands_always_work() {
         "version",
         "--version",
         "-v",
-        "real-version",
+        "version-code",
         "help",
         "--help",
         "-h",
