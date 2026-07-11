@@ -1,0 +1,21 @@
+tests/integration/superuser_guard.rs
+  s_aefe88d85936fc::t_3592fd59fa97a7 25-33,37-45
+src/main.rs
+  s_aefe88d85936fc::t_3592fd59fa97a7 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9-1",
+  "base_commit_sha": "6c5c41926ef331c4af1dc02a38284dddb66b198f",
+  "prompts": {},
+  "sessions": {
+    "s_aefe88d85936fc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5029-38c0-7653-88ac-7c2db76a6ae1",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "luhaoyu <haoyu3@163.com>"
+    }
+  }
+}
